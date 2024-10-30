@@ -16,11 +16,6 @@ public class NetworkManager implements Runnable {
     static IOManager io = new IOManager();
     static ArrayList<Route> routes = new ArrayList<>();
 
-    public NetworkManager() {
-        io = new IOManager();
-        routes = new ArrayList<>();
-    }
-
     public static void main(String[] args) throws IOException {
         // Reads the file and sets up the routes table
         String[] defaultRoutes;
@@ -37,21 +32,23 @@ public class NetworkManager implements Runnable {
         sc = new Scanner(System.in);
 
         // Inicializacao da socket
-        client = new DatagramSocket(9000, InetAddress.getByName("192.168.0.24"));
-        System.out.println(client.getInetAddress());
+        client = new DatagramSocket(9000);
 
-        // IP da maquina
-        InetAddress ipAddress = client.getInetAddress();
-        // System.out.println(ipAddress);
+        // Pega o IP da maquina e converte para string
+        InetAddress localHost = InetAddress.getLocalHost();
+        String hostAdress = localHost.getHostAddress();
 
         // Mensagem quando o roteador se conectar na rede
         byte[] sendData = new byte[1024];
-        String msg = "*" + ipAddress.toString();
+        String msg = "*" + hostAdress;
         sendData = msg.getBytes();
+
+        // Montagem do pacote e envio para os vizinhos
         for (Route r : routes) {
             InetAddress ipReceiver = InetAddress.getByName(r.getIp());
             int portReceiver = r.getPort();
-            DatagramPacket sendPacket = new DatagramPacket(sendData, sendData.length, ipReceiver, portReceiver);
+            DatagramPacket sendPacket = new DatagramPacket(sendData, sendData.length,
+                    ipReceiver, portReceiver);
             client.send(sendPacket);
         }
 
@@ -70,28 +67,33 @@ public class NetworkManager implements Runnable {
     public void routeAnnouncer() {
         System.out.println("AQUI 1");
         while (true) {
-            // try {
-            // // Espera de 15 segundos para envio da tabela de roteamento
-            // wait(15000);
+            try {
+                // Espera de 15 segundos para envio da tabela de roteamento
+                Thread.sleep(15000);
 
-            // // Transformando a tabela de roteamento em mensagem
-            // String msg = "";
-            // for (Route r : routes) {
-            // msg += "@" + r.getIp() + "-" + r.getWeight();
-            // }
+                // Transforma a tabela de roteamento em mensagem
+                String msg = "";
+                for (Route r : routes) {
+                    msg += "@" + r.getIp() + "-" + r.getWeight();
+                }
+                byte[] sendData = new byte[1024];
+                sendData = msg.getBytes();
 
-            // // Montando o pacote
-            // byte[] sendData = new byte[1024];
-            // sendData = msg.getBytes();
-            // DatagramPacket sendPacket = new DatagramPacket(sendData, sendData.length);
-
-            // // Envio do pacote
-            // client.send(sendPacket);
-            // } catch (InterruptedException e) {
-            // e.printStackTrace();
-            // } catch (IOException e) {
-            // e.printStackTrace();
-            // }
+                // Envia apenas para os vizinhos
+                for (Route r : routes) {
+                    if (r.getWeight() == 1) {
+                        InetAddress ipReceiver = InetAddress.getByName(r.getIp());
+                        int portReceiver = r.getPort();
+                        DatagramPacket sendPacket = new DatagramPacket(sendData, sendData.length, ipReceiver,
+                                portReceiver);
+                        client.send(sendPacket);
+                    }
+                }
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
         }
     }
 
@@ -99,15 +101,22 @@ public class NetworkManager implements Runnable {
     public void messageReader() {
         System.out.println("AQUI 2");
         while (true) {
-            // try {
-            // // Recebimento da mensagem
-            // byte[] receiveData = new byte[1024];
-            // DatagramPacket receivePacket = new DatagramPacket(receiveData,
-            // receiveData.length);
-            // client.receive(receivePacket);
-            // } catch (IOException e) {
-            // e.printStackTrace();
-            // }
+            try {
+                // Recebimento da mensagem
+                byte[] receiveData = new byte[1024];
+                DatagramPacket receivePacket = new DatagramPacket(receiveData,
+                        receiveData.length);
+                client.receive(receivePacket);
+
+                // Conversao da mensagem para string
+                String data = new String(receivePacket.getData());
+                data = data.split("\0")[0];
+
+                // Imprimir a mensagem
+                System.out.println(data);
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
         }
     }
 
