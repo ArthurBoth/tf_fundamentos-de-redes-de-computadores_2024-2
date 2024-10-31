@@ -5,6 +5,10 @@ public class Route {
     private int port;
     private int weight;
 
+    public boolean isNeighbor() {
+        return this.getWeight() == 1;
+    } 
+
     // ************************************************************
     // Getters and Setters
     public String getIp() {
@@ -56,7 +60,6 @@ public class Route {
     }
 
     private static class Builder implements IpSetter, PortSetter, WeightSetter {
-
         private String ip;
         private int port;
         private int weight;
