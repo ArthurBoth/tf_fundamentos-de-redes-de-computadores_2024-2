@@ -15,18 +15,42 @@ public abstract class ConsoleLogger {
         public static final String WHITE    = "\u001B[37m";
     }
 
-    public static void logGreen(String message) {
+    public static synchronized void logGreen(String message) {
         System.out.print(Colours.GREEN);
         System.out.print(message);
         System.out.println(Colours.RESET);
     }
+    
+    public static synchronized void logBlue(String message) {
+        System.out.print(Colours.BLUE);
+        System.out.print(message);
+        System.out.println(Colours.RESET);
+    }
 
-    public static void logWhite(String message) {
+    public static synchronized void logCyan(String message) {
+        System.out.print(Colours.CYAN);
+        System.out.print(message);
+        System.out.println(Colours.RESET);
+    }
+
+    public static synchronized void logYellow(String message) {
+        System.out.print(Colours.YELLOW);
+        System.out.print(message);
+        System.out.println(Colours.RESET);
+    }
+
+    public static synchronized void logWhite(String message) {
         System.out.print(Colours.RESET);
         System.out.println(message);
     }
+
+    public static synchronized void logRed(String message) {
+        System.out.print(Colours.RED);
+        System.out.println(message);
+        System.out.print(Colours.RESET);
+    }
     
-    public static void logError(String message, Exception e) {
+    public static synchronized void logError(String message, Exception e) {
         System.out.println(Colours.RED);
         System.err.printf("ERROR: %s%n", message);
 
@@ -35,7 +59,7 @@ public abstract class ConsoleLogger {
         System.out.print(Colours.RESET);
     }
 
-    public static void logError(String message) {
+    public static synchronized void logError(String message) {
         System.out.print(Colours.RED);
         System.err.printf("ERROR: %s", message);
         System.out.println(Colours.RESET);

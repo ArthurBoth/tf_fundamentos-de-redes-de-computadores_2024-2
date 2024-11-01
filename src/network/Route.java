@@ -36,7 +36,7 @@ public class Route {
     }
 
     // ************************************************************
-    // Builder pattern for flavoring this assignment
+    // Builder pattern implementation
     private Route(Builder builder) {
         this.ip = builder.ip;
         this.port = builder.port;

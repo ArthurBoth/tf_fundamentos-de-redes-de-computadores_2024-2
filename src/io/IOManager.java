@@ -12,4 +12,6 @@ public class IOManager {
         return FileIO.read(ConfigurationConstants.CONFIG_FILE_PATH +
                 ConfigurationConstants.DEFAULT_ROUTES_FILE);
     }
+
+    public void printMesssge(String message) {}
 }

@@ -1,13 +1,15 @@
 package network.threads;
 
+import java.net.DatagramSocket;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.atomic.AtomicReferenceArray;
+
 import io.consoleIO.ConsoleLogger;
 import network.Route;
 
-import java.util.concurrent.atomic.AtomicReferenceArray;
-
 public class TimeSchedulerThread extends NetworkThread{
     private final long defaultMessageTimeMS;
-    private final SenderThread messageSender;
+    private final BlockingQueue<UDPWrapper> messageSender;
     
     private volatile String defaultMessage;
     private AtomicReferenceArray<Route> routes;
@@ -22,39 +24,48 @@ public class TimeSchedulerThread extends NetworkThread{
 
     @Override
     public void run() {
-        while (!running) {
+        ConsoleLogger.logYellow("TimeScheduler thread started");
+        super.running = true;
+        
+        while (running) {
             try {
                 Thread.sleep(defaultMessageTimeMS);
                 sendDefaultMessage();
             } catch (InterruptedException e) {
-                ConsoleLogger.logWhite("Message scheduler interrupted");
+                ConsoleLogger.logError("Error while sleeping", e);
             }
         }
     }
 
     private void sendDefaultMessage() {
+        Route route;
         for (int i = 0; i < routes.length(); i++) {
-            Route route = routes.get(i);
-            messageSender.sendMessage(route, defaultMessage);
+            route = routes.get(i);
+            if (super.running) {
+                messageSender.add(UDPWrapper.build()
+                                    .ip(route.getIp())
+                                    .port(route.getPort())
+                                    .message(defaultMessage));
+            }
         }
     }
 
     // ************************************************************
     // Builder pattern implementation
     private TimeSchedulerThread(Builder builder) {
-        super(builder.port);
+        super(builder.socket);
         this.defaultMessageTimeMS = builder.defaultMessageTimeMS;
         this.messageSender = builder.messageSender;
         this.defaultMessage = builder.defaultMessage;
         routes = new AtomicReferenceArray<>(new Route[0]);
     }
 
-    public static PortSetter build() {
+    public static SocketSetter build() {
         return new Builder();
     }
 
-    public interface PortSetter {
-        DefaultMessageTimeMsSetter port(int port);
+    public interface SocketSetter {
+        DefaultMessageTimeMsSetter socket(DatagramSocket socket);
     }
 
     public interface DefaultMessageTimeMsSetter {
@@ -62,22 +73,22 @@ public class TimeSchedulerThread extends NetworkThread{
     }
 
     public interface MessageSenderSetter {
-        DefaultMessageSetter messageSender(SenderThread messageSender);
+        DefaultMessageSetter messageSender(BlockingQueue<UDPWrapper> messageSender);
     }
 
     public interface DefaultMessageSetter {
         TimeSchedulerThread routesTableMessage(String defaultMessage);
     }
 
-    private static class Builder implements PortSetter, DefaultMessageTimeMsSetter, MessageSenderSetter, DefaultMessageSetter {
-        private int port;
+    private static class Builder implements SocketSetter, DefaultMessageTimeMsSetter, MessageSenderSetter, DefaultMessageSetter {
+        private DatagramSocket socket;
         private long defaultMessageTimeMS;
-        private SenderThread messageSender;
+        private BlockingQueue<UDPWrapper> messageSender;
         private String defaultMessage;
 
         @Override
-        public DefaultMessageTimeMsSetter port(int port) {
-            this.port = port;
+        public DefaultMessageTimeMsSetter socket(DatagramSocket socket) {
+            this.socket = socket;
             return this;
         }
 
@@ -88,13 +99,14 @@ public class TimeSchedulerThread extends NetworkThread{
         }
 
         @Override
-        public DefaultMessageSetter messageSender(SenderThread messageSender) {
+        public DefaultMessageSetter messageSender(BlockingQueue<UDPWrapper> messageSender) {
             this.messageSender = messageSender;
             return this;
         }
 
         @Override
         public TimeSchedulerThread routesTableMessage(String defaultMessage) {
+            this.defaultMessage = defaultMessage;
             return new TimeSchedulerThread(this);
         }
     }
