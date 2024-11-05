@@ -3,6 +3,7 @@ package constants;
 public interface ConfigurationConstants {
     static final String CONFIG_FILE_PATH    = "configFiles/";
     static final String DEFAULT_ROUTES_FILE = "roteadores.txt";
+    static final String DEFAULT_LOG_FILE    = "messages.log";
 
     static final int MAX_WEIGHT        = 16;
     static final int DEFAULT_PORT      = 9000;

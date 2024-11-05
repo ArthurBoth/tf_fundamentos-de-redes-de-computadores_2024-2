@@ -3,6 +3,7 @@ package network;
 import java.io.IOException;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
+import java.net.UnknownHostException;
 import java.util.HashMap;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
@@ -19,20 +20,23 @@ import network.threads.UDPWrapper;
 public class NetworkManager {
     // Variables relevant to the manager
     private IOManager io;
-    private HashMap<String, Route> routes; // <ip, <ip, port, weight>>
+    private HashMap<String, Route> routes; // <destinationIp, <sendIp, port, weight>>
 
     // Variables relevant to the network
     private DatagramSocket socket;
     private SenderThread senderThread;
     private ReceiverThread receiverThread;
     private TimeSchedulerThread messageSchedulerThread;
-    private BlockingQueue<String> receiverQueue;
+
+    // Variables relevant to the network state
+    private BlockingQueue<String> messageQueue;
     private boolean insideNetwork;
 
     public NetworkManager() {
-        io = new IOManager();
         routes = new HashMap<>();
-        receiverQueue = new LinkedBlockingQueue<>();
+        messageQueue = new LinkedBlockingQueue<>();
+
+        io = new IOManager(messageQueue);
     }
 
     private void setup() {
@@ -53,7 +57,7 @@ public class NetworkManager {
             senderQueue = new LinkedBlockingQueue<>();
 
             senderThread = new SenderThread(socket, senderQueue);
-            receiverThread = new ReceiverThread(socket, receiverQueue);
+            receiverThread = new ReceiverThread(socket, messageQueue);
             messageSchedulerThread = TimeSchedulerThread.build()
                     .socket(socket)
                     .defaultMessageTimeMS(ConfigurationConstants.DEFAULT_MESSAGE_TIME_MS)
@@ -67,12 +71,17 @@ public class NetworkManager {
     }
 
     public void start() {
-        setup();
-        enterNetwork();
+        try {
+            setup();
+            enterNetwork();
+            io.startConsole(InetAddress.getLocalHost().getHostAddress());
+        } catch (UnknownHostException e) {
+            ConsoleLogger.logError("Error while getting local host", e);
+            return;
+        }
         
-        survive();
-        // messageLoop();
-        // TODO: fazer IO em console para mensagens personalizadas 
+        // survive();
+        messageLoop();
     }
     
     private void messageLoop() {
@@ -80,7 +89,7 @@ public class NetworkManager {
         String receivedMessage;
         while (stayAlive) {
             try {
-                receivedMessage = receiverQueue.poll(ConfigurationConstants.SOCKET_TIMEOUT_MS, TimeUnit.MILLISECONDS);
+                receivedMessage = messageQueue.poll(ConfigurationConstants.SOCKET_TIMEOUT_MS, TimeUnit.MILLISECONDS);
                 stayAlive = processMessage(receivedMessage);
             } catch (InterruptedException e) {
                 ConsoleLogger.logError("Error while sleeping", e);
@@ -88,9 +97,7 @@ public class NetworkManager {
         }
     }
 
-    private boolean processMessage(String codedMessage) {
-        String senderIp = codedMessage.split(":",2)[0];
-        String message = codedMessage.split(":",2)[1];
+    private boolean processMessage(String message) {
         char header = (message == null) ? '↔' : message.toCharArray()[0];
 
         switch (header) {
@@ -223,6 +230,7 @@ public class NetworkManager {
         senderThread.stop();
         receiverThread.stop();
         messageSchedulerThread.stop();
+        io.stopConsole();
     }
 
     private void enterNetwork() {
