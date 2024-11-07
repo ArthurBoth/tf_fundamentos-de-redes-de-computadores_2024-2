@@ -1,19 +1,21 @@
 package io;
 
-import java.util.Date;
 import java.util.concurrent.BlockingQueue;
 
 import constants.ConfigurationConstants;
+import constants.RegEx;
 import io.consoleIO.TerminalManager;
 import io.fileIO.FileIO;
+import io.fileIO.FileLogger;
 
 public class IOManager {
     BlockingQueue<String> networkQueue;
     TerminalManager terminal;
+    FileLogger logger;
 
     public IOManager(BlockingQueue<String> networkQueue) {
         this.networkQueue = networkQueue;
-        logMessage(String.format("New execution started at %s", new Date(System.currentTimeMillis()).toString()));
+        logger = new FileLogger();
     }
     
     public String[] getDefaultRoutes() {
@@ -21,8 +23,8 @@ public class IOManager {
                             ConfigurationConstants.DEFAULT_ROUTES_FILE);
     }
     
-    public void startConsole(String userIp) {
-        terminal = new TerminalManager(userIp, networkQueue);
+    public void startConsole(String userIp, boolean insideNetwork) {
+        terminal = new TerminalManager(userIp, networkQueue, insideNetwork);
         new Thread(() -> terminal.run()).start();
     }
 
@@ -30,7 +32,9 @@ public class IOManager {
         terminal.stop().interrupt();
     }
 
-    public void logMessage(String message) {
-        FileIO.writeLine(ConfigurationConstants.DEFAULT_LOG_FILE, message);
+    public void logMessage(String senderIp,String message) {
+        if ((!ConfigurationConstants.LOG_LOCALHOST) && (senderIp.equals(RegEx.LOCALHOST))) return;
+
+        logger.log(String.format("Message from %s: %s", senderIp, message));
     }
 }

@@ -29,19 +29,20 @@ public class NetworkManager {
     private TimeSchedulerThread messageSchedulerThread;
 
     // Variables relevant to the network state
-    private BlockingQueue<String> messageQueue;
+    private BlockingQueue<String> receiveMessages;
+    private BlockingQueue<UDPWrapper> sendMessages;
     private boolean insideNetwork;
 
     public NetworkManager() {
         routes = new HashMap<>();
-        messageQueue = new LinkedBlockingQueue<>();
+        receiveMessages = new LinkedBlockingQueue<>();
+        sendMessages = new LinkedBlockingQueue<>();
 
-        io = new IOManager(messageQueue);
+        io = new IOManager(receiveMessages);
     }
 
     private void setup() {
         String[] defaultRoutes;
-        BlockingQueue<UDPWrapper> senderQueue;
 
         defaultRoutes = io.getDefaultRoutes();
         for (String routeIp : defaultRoutes) {
@@ -54,14 +55,14 @@ public class NetworkManager {
 
         try {
             socket = new DatagramSocket(ConfigurationConstants.DEFAULT_PORT);
-            senderQueue = new LinkedBlockingQueue<>();
+            sendMessages = new LinkedBlockingQueue<>();
 
-            senderThread = new SenderThread(socket, senderQueue);
-            receiverThread = new ReceiverThread(socket, messageQueue);
+            senderThread = new SenderThread(socket, sendMessages);
+            receiverThread = new ReceiverThread(socket, receiveMessages);
             messageSchedulerThread = TimeSchedulerThread.build()
                     .socket(socket)
                     .defaultMessageTimeMS(ConfigurationConstants.DEFAULT_MESSAGE_TIME_MS)
-                    .messageSender(senderQueue)
+                    .messageSender(sendMessages)
                     .routesTableMessage(buildRouteAnnouncementMessage());
                     
             updateNeighbors();
@@ -73,8 +74,8 @@ public class NetworkManager {
     public void start() {
         try {
             setup();
-            enterNetwork();
-            io.startConsole(InetAddress.getLocalHost().getHostAddress());
+            // enterNetwork();
+            io.startConsole(InetAddress.getLocalHost().getHostAddress(), insideNetwork);
         } catch (UnknownHostException e) {
             ConsoleLogger.logError("Error while getting local host", e);
             return;
@@ -82,6 +83,12 @@ public class NetworkManager {
         
         // survive();
         messageLoop();
+
+        socket.close();
+        messageSchedulerThread.stop().interrupt();
+        senderThread.stop().interrupt();
+        receiverThread.stop().interrupt();
+        io.stopConsole();
     }
     
     private void messageLoop() {
@@ -89,7 +96,7 @@ public class NetworkManager {
         String receivedMessage;
         while (stayAlive) {
             try {
-                receivedMessage = messageQueue.poll(ConfigurationConstants.SOCKET_TIMEOUT_MS, TimeUnit.MILLISECONDS);
+                receivedMessage = receiveMessages.poll(ConfigurationConstants.SOCKET_TIMEOUT_MS, TimeUnit.MILLISECONDS);
                 stayAlive = processMessage(receivedMessage);
             } catch (InterruptedException e) {
                 ConsoleLogger.logError("Error while sleeping", e);
@@ -97,16 +104,22 @@ public class NetworkManager {
         }
     }
 
-    private boolean processMessage(String message) {
-        char header = (message == null) ? '↔' : message.toCharArray()[0];
+    private boolean processMessage(String codedMessage) {
+        if (codedMessage == null) return true;
+
+        String senderIp = codedMessage.split(":",2)[0];
+        String message = codedMessage.split(":",2)[1];
+        char header = message.toCharArray()[0];
+
+        io.logMessage(senderIp, message);
 
         switch (header) {
             case '@' -> {handleRoutesTable(message);}
             case '*' -> {handleRouteAnnouncement(message);}
             case '!' -> {handleCustomMessage(message);}
-            case 'º' -> {changeNetworkState();}         // Alt + 0186 
-            case '■' -> {return false;} // Should die   // Alt + 1022  
-            case '↔' -> {return true;}  // No message   // Alt + 2589 
+            case 'º' -> {changeNetworkState();}                     // Alt + 0186 
+            case '¼' -> {handleSendMessage(message.substring(1));}  // Alt + 7852  
+            case '▬' -> {return false;} // Should die               // Alt + 7958   
             default  -> {ConsoleLogger.logRed("Unsuported message header, message discarted: " + header);}
         }
         return true; // Should stay alive
@@ -144,6 +157,16 @@ public class NetworkManager {
     }
     
     private void handleCustomMessage(String message) {}
+
+    private void handleSendMessage(String message) {
+        String[] messageData = message.split(";");
+        String destinationIp = messageData[0].substring(1);
+
+        sendMessages.add(UDPWrapper.build()
+                                    .ip(destinationIp)
+                                    .port(ConfigurationConstants.DEFAULT_PORT)
+                                    .message(message));
+    }
 
     /* Test method */
     private void survive() { 
@@ -230,7 +253,6 @@ public class NetworkManager {
         senderThread.stop();
         receiverThread.stop();
         messageSchedulerThread.stop();
-        io.stopConsole();
     }
 
     private void enterNetwork() {

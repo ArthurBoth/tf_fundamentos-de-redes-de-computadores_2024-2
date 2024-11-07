@@ -19,7 +19,7 @@ public class SenderThread extends NetworkThread {
         this.messageQueue = messageQueue;
     }
 
-    public void sendMessage(UDPWrapper wrapper) {
+    private void sendMessage(UDPWrapper wrapper) {
         InetAddress neighbor;
         int port;
         byte[] data;
