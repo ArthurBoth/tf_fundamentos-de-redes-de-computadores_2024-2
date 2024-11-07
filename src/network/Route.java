@@ -1,54 +1,43 @@
 package network;
 
 public class Route {
-    private String ip;
-    private int port;
-    private int weight;
+    private final String sendToIp;
+    private final int port;
+    private final int weight;
 
     public boolean isNeighbor() {
         return this.getWeight() == 1;
-    } 
+    }
 
     // ************************************************************
-    // Getters and Setters
-    public String getIp() {
-        return this.ip;
-    }
-
-    public void setIp(String ip) {
-        this.ip = ip;
-    }
+    // Getters
 
     public int getPort() {
         return this.port;
-    }
-
-    public void setPort(int port) {
-        this.port = port;
     }
 
     public int getWeight() {
         return this.weight;
     }
 
-    public void setWeight(int weight) {
-        this.weight = weight;
+    public String getSendToIp() {
+        return sendToIp;
     }
 
     // ************************************************************
     // Builder pattern implementation
     private Route(Builder builder) {
-        this.ip = builder.ip;
+        this.sendToIp = builder.sendToIp;
         this.port = builder.port;
         this.weight = builder.weight;
     }
 
-    public static IpSetter build() {
+    public static SendToIpSetter build() {
         return new Builder();
     }
 
-    public interface IpSetter {
-        PortSetter ip(String ip);
+    public interface SendToIpSetter {
+        PortSetter sendTo(String sendToIp);
     }
 
     public interface PortSetter {
@@ -59,14 +48,14 @@ public class Route {
         Route weight(int weight);
     }
 
-    private static class Builder implements IpSetter, PortSetter, WeightSetter {
-        private String ip;
+    private static class Builder implements SendToIpSetter, PortSetter, WeightSetter {
+        private String sendToIp;
         private int port;
         private int weight;
 
         @Override
-        public PortSetter ip(String ip) {
-            this.ip = ip;
+        public PortSetter sendTo(String sendToIp) {
+            this.sendToIp = sendToIp;
             return this;
         }
 

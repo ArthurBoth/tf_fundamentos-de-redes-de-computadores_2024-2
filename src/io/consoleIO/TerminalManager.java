@@ -4,7 +4,6 @@ import java.util.NoSuchElementException;
 import java.util.Scanner;
 import java.util.concurrent.BlockingQueue;
 
-import constants.ConfigurationConstants;
 import constants.RegEx;
 
 public class TerminalManager implements Runnable {
@@ -67,14 +66,27 @@ public class TerminalManager implements Runnable {
 
     private void processResponse(int response) {
         switch (response) {
-            case 1 -> {messageQueue.add(String.format("%s:ºSwichNetworkStateº", RegEx.LOCALHOST));}
+            case 1 -> {changeNetworkState();}
             case 2 -> {buildMessage();} 
             case 3 -> {stop();}
             default -> {ConsoleLogger.logRed("Invalid response. Please try again.");}
         }
     }
 
+    private void changeNetworkState() {
+        messageQueue.add(String.format("%s:ºSwichNetworkStateº", RegEx.LOCALHOST));
+        try {
+            Thread.sleep(1000);
+        } catch (InterruptedException e) {
+            ConsoleLogger.logRed("Error while changing network state.");
+        }
+    }
+
     private void buildMessage() {
+        if (!insideNetwork) {
+            ConsoleLogger.logRed("You must be connected to the network to send a message.");
+            return;
+        }
         String destinationIp = getUserInputIp();
         String message = getUserInputMessage();
 
@@ -116,5 +128,13 @@ public class TerminalManager implements Runnable {
             }
         }
         return message;
+    }
+
+    public void enterNetwork() {
+        insideNetwork = true;
+    }
+
+    public void exitNetwork() {
+        insideNetwork = false;
     }
 }

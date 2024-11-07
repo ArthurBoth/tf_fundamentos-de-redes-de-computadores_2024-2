@@ -10,11 +10,14 @@ public class FileLogger {
 
     public FileLogger() {
         dateTime = DateTimeFormatter.ofPattern(ConfigurationConstants.DATE_TIME_LOG_FORMAT);
-        FileIO.writeLine(ConfigurationConstants.DEFAULT_LOG_FILE, "*--".repeat(30) + '*');
+        
+        if (ConfigurationConstants.CLEAR_PREVIOUS_LOGS) FileIO.clearFile(ConfigurationConstants.LOG_FILE_NAME);
+  
+        FileIO.writeLine(ConfigurationConstants.LOG_FILE_NAME, "*--".repeat(30) + '*');
     } 
 
     public void log(String message) {
         String line = String.format("%s: %s", dateTime.format(LocalDateTime.now()), message);
-        FileIO.writeLine(ConfigurationConstants.DEFAULT_LOG_FILE, line);
+        FileIO.writeLine(ConfigurationConstants.LOG_FILE_NAME, line);
     }
 }

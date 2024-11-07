@@ -63,4 +63,17 @@ public abstract class FileIO {
             ConsoleLogger.logError("An error occurred. (writing line-by-line)", e);
         }
     }
+
+    public static void clearFile(String path) {
+        try {
+            FileWriter fileWriter = new FileWriter(path);
+
+            fileWriter.write("");
+            
+            fileWriter.close();
+            
+        } catch (IOException e) {
+            ConsoleLogger.logError("An error occurred. (clearing file)", e);
+        }
+    }
 }

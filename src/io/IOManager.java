@@ -20,7 +20,7 @@ public class IOManager {
     
     public String[] getDefaultRoutes() {
         return FileIO.read(ConfigurationConstants.CONFIG_FILE_PATH +
-                            ConfigurationConstants.DEFAULT_ROUTES_FILE);
+                            ConfigurationConstants.ROUTES_FILE_NAME);
     }
     
     public void startConsole(String userIp, boolean insideNetwork) {
@@ -32,9 +32,17 @@ public class IOManager {
         terminal.stop().interrupt();
     }
 
-    public void logMessage(String senderIp,String message) {
+    public void log(String senderIp,String message) {
         if ((!ConfigurationConstants.LOG_LOCALHOST) && (senderIp.equals(RegEx.LOCALHOST))) return;
 
         logger.log(String.format("Message from %s: %s", senderIp, message));
+    }
+
+    public void enterNetwork() {
+        terminal.enterNetwork();
+    }
+    
+    public void exitNetwork() {
+        terminal.exitNetwork();
     }
 }

@@ -32,9 +32,9 @@ public class SenderThread extends NetworkThread {
 
             packet = new DatagramPacket(data, data.length, neighbor, port);
             socket.send(packet);
-            
-        }  catch (SocketException e) {
-                super.stop();
+
+        } catch (SocketException e) {
+
         } catch (IOException e) {
             ConsoleLogger.logError("Error while sending", e);
         }
