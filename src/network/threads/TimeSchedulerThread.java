@@ -14,7 +14,7 @@ public class TimeSchedulerThread extends NetworkThread {
     private volatile String defaultMessage;
     private AtomicReferenceArray<Route> routes;
 
-    public void setRoutes(Route[] routes) {
+    public void setNeighbours(Route[] routes) {
         this.routes = new AtomicReferenceArray<>(routes);
     }
 
@@ -43,9 +43,9 @@ public class TimeSchedulerThread extends NetworkThread {
             route = routes.get(i);
             if (super.running) {
                 messageSender.add(UDPWrapper.build()
-                        .ip(route.getIpEnd())
-                        .port(route.getPort())
-                        .message(defaultMessage));
+                                            .ip(route.getSendToIp())
+                                            .port(route.getPort())
+                                            .message(defaultMessage));
             }
         }
     }

@@ -37,7 +37,6 @@ public class ReceiverThread extends NetworkThread {
                 message = new String(packet.getData()).split(RegEx.NULL)[0];
 
                 messageQueue.put(senderIp + ':' + message);
-                ConsoleLogger.logBlue(message);
 
             } catch (SocketException e) {
                 super.stop();
@@ -49,5 +48,5 @@ public class ReceiverThread extends NetworkThread {
             }
         }
     }
-
+    
 }

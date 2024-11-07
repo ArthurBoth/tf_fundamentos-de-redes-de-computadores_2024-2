@@ -40,8 +40,15 @@ public abstract class ConsoleLogger {
     }
 
     public static synchronized void logWhite(String message) {
+        logWhite(message, true);
+    }
+    
+    public static synchronized void logWhite(String message, boolean newLine) {
         System.out.print(Colours.RESET);
-        System.out.println(message);
+        System.out.print(message);
+        if (newLine) {
+            System.out.print("\n");
+        }
     }
 
     public static synchronized void logRed(String message) {
