@@ -26,15 +26,16 @@ public class SenderThread extends NetworkThread {
         DatagramPacket packet;
 
         try {
+            ConsoleLogger.logYellow(wrapper.getMessage());
             data = wrapper.getMessageBytes();
             neighbor = InetAddress.getByName(wrapper.getIp());
             port = wrapper.getPort();
 
             packet = new DatagramPacket(data, data.length, neighbor, port);
             socket.send(packet);
-            
-        }  catch (SocketException e) {
-                super.stop();
+
+        } catch (SocketException e) {
+            super.stop();
         } catch (IOException e) {
             ConsoleLogger.logError("Error while sending", e);
         }
@@ -45,11 +46,12 @@ public class SenderThread extends NetworkThread {
         ConsoleLogger.logGreen("Sender thread started");
         UDPWrapper message;
         super.running = true;
-        
+
         while (running) {
             try {
                 message = messageQueue.poll(ConfigurationConstants.SOCKET_TIMEOUT_MS, TimeUnit.MILLISECONDS);
-                if (message != null) sendMessage(message);
+                if (message != null)
+                    sendMessage(message);
             } catch (InterruptedException e) {
                 ConsoleLogger.logError("Error while sleeping", e);
             }

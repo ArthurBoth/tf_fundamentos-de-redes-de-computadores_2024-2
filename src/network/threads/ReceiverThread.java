@@ -32,12 +32,12 @@ public class ReceiverThread extends NetworkThread {
                 data = new byte[ConfigurationConstants.MAX_MESSAGE_SIZE];
                 packet = new DatagramPacket(data, data.length);
                 socket.receive(packet);
-                
+
                 senderIp = packet.getAddress().getHostAddress();
                 message = new String(packet.getData()).split(RegEx.NULL)[0];
-                
+
                 messageQueue.put(senderIp + ':' + message);
-                ConsoleLogger.logGreen("Message received: " + message);
+                ConsoleLogger.logBlue(message);
 
             } catch (SocketException e) {
                 super.stop();
@@ -49,5 +49,5 @@ public class ReceiverThread extends NetworkThread {
             }
         }
     }
-    
+
 }

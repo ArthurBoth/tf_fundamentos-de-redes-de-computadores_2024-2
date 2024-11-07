@@ -1,8 +1,10 @@
 package network;
 
 import java.io.IOException;
+import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
+import java.net.UnknownHostException;
 import java.util.HashMap;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
@@ -19,7 +21,7 @@ import network.threads.UDPWrapper;
 public class NetworkManager {
     // Variables relevant to the manager
     private IOManager io;
-    private HashMap<String, Route> routes; // <ip, <ip, port, weight>>
+    private HashMap<String, Route> routes; // <ipEnd, <ipEnd, port, weight, ipTo>>
 
     // Variables relevant to the network
     private DatagramSocket socket;
@@ -43,9 +45,9 @@ public class NetworkManager {
         for (String routeIp : defaultRoutes) {
             ConsoleLogger.logWhite("Default route added: " + routeIp);
             routes.put(routeIp, Route.build()
-                                        .ip(routeIp)
-                                        .port(ConfigurationConstants.DEFAULT_PORT)
-                                        .weight(ConfigurationConstants.DEFAULT_WEIGHT));
+                    .ipEnd(routeIp)
+                    .port(ConfigurationConstants.DEFAULT_PORT)
+                    .weight(ConfigurationConstants.DEFAULT_WEIGHT).ipTo(routeIp));
         }
 
         try {
@@ -59,7 +61,7 @@ public class NetworkManager {
                     .defaultMessageTimeMS(ConfigurationConstants.DEFAULT_MESSAGE_TIME_MS)
                     .messageSender(senderQueue)
                     .routesTableMessage(buildRouteAnnouncementMessage());
-                    
+
             updateNeighbors();
         } catch (IOException e) {
             ConsoleLogger.logError("Erro ao criar socket", e);
@@ -69,17 +71,19 @@ public class NetworkManager {
     public void start() {
         setup();
         enterNetwork();
-        
-        survive();
-        // messageLoop();
-        // TODO: fazer IO em console para mensagens personalizadas 
+
+        // survive();
+        messageLoop();
+        // TODO: fazer IO em console para mensagens personalizadas
     }
-    
+
     private void messageLoop() {
+        messageSchedulerThread.setDefaultMessage("!qwertyuiop;127.0.0.1;Oi tudo bem?");
         boolean stayAlive = true;
         String receivedMessage;
         while (stayAlive) {
             try {
+                ConsoleLogger.logGreen("aqui");
                 receivedMessage = receiverQueue.poll(ConfigurationConstants.SOCKET_TIMEOUT_MS, TimeUnit.MILLISECONDS);
                 stayAlive = processMessage(receivedMessage);
             } catch (InterruptedException e) {
@@ -89,57 +93,112 @@ public class NetworkManager {
     }
 
     private boolean processMessage(String codedMessage) {
-        String senderIp = codedMessage.split(":",2)[0];
-        String message = codedMessage.split(":",2)[1];
-        char header = (message == null) ? '↔' : message.toCharArray()[0];
+        if (codedMessage == null)
+            return true;
+        String senderIp = codedMessage.split(":", 2)[0];
+        String message = codedMessage.split(":", 2)[1];
+        char header = message.toCharArray()[0];
 
         switch (header) {
-            case '@' -> {handleRoutesTable(message);}
-            case '*' -> {handleRouteAnnouncement(message);}
-            case '!' -> {handleCustomMessage(message);}
-            case 'º' -> {changeNetworkState();}         // Alt + 0186 
-            case '■' -> {return false;} // Should die   // Alt + 1022  
-            case '↔' -> {return true;}  // No message   // Alt + 2589 
-            default  -> {ConsoleLogger.logRed("Unsuported message header, message discarted: " + header);}
+            case '@' -> {
+                handleRoutesTable(message, senderIp);
+            }
+            case '*' -> {
+                handleRouteAnnouncement(message, senderIp);
+            }
+            case '!' -> {
+                handleCustomMessage(message);
+            }
+            case 'º' -> {
+                changeNetworkState();
+            } // Alt + 0186
+            case '■' -> {
+                return false;
+            } // Should die // Alt + 1022
+            case '↔' -> {
+                return true;
+            } // No message // Alt + 2589
+            default -> {
+                ConsoleLogger.logRed("Unsuported message header, message discarted: " + header);
+            }
         }
         return true; // Should stay alive
     }
 
-    private void handleRoutesTable(String table) {
+    private void handleRoutesTable(String table, String senderIp) {
         // Recebe tabela de rotas
         // Separa as rotas
         String[] routesTable; // array que vai guardar a string ip-peso
-        String[] routeData;   // array que vai guardar ip em [0] e peso em [1]
+        String[] routeData; // array que vai guardar ip em [0] e peso em [1]
         Route[] updatedRoutes;
 
         routesTable = table.split("@");
         for (String route : routesTable) {
             routeData = route.split("-");
-            if (routeData.length == 2) {
-                // Adiciona a rota à tabela de atualizações
-                this.routes.put(routeData[0], Route.build()
-                                                    .ip(routeData[0])
-                                                    .port(ConfigurationConstants.DEFAULT_PORT)
-                                                    .weight(Integer.parseInt(routeData[1] + 1)));
+            String ipEnd = routeData[0];
+            String weight = routeData[1];
+            if (!routes.containsKey(ipEnd)) {
+                routes.put(ipEnd,
+                        Route.build().ipEnd(ipEnd).port(ConfigurationConstants.DEFAULT_PORT)
+                                .weight((Integer.parseInt(weight) + 1)).ipTo(senderIp));
+            } else {
+                if (Integer.parseInt(weight) < routes.get(ipEnd).getWeight()) {
+                    routes.replace(ipEnd,
+                            Route.build().ipEnd(ipEnd).port(ConfigurationConstants.DEFAULT_PORT)
+                                    .weight(Integer.parseInt(weight) + 1).ipTo(senderIp));
+                    // PRINTAR A MODIFICACAO FEITA
+                }
             }
+            // if (routeData.length == 2) {
+            // // Adiciona a rota à tabela de atualizações
+            // this.routes.put(routeData[0], Route.build()
+            // .ip(routeData[0])
+            // .port(ConfigurationConstants.DEFAULT_PORT)
+            // .weight(Integer.parseInt(routeData[1] + 1)));
         }
-        // updateRoutes(updatedRoutes);
     }
 
-    private void handleRouteAnnouncement(String message) {
+    // updateRoutes(updatedRoutes);
+    // }
+
+    private void handleRouteAnnouncement(String message, String senderIp) {
         String ip = message.substring(1);
         routes.put(ip, Route.build()
-                            .ip(ip)
-                            .port(ConfigurationConstants.DEFAULT_PORT)
-                            .weight(ConfigurationConstants.DEFAULT_WEIGHT));
-                            
+                .ipEnd(ip)
+                .port(ConfigurationConstants.DEFAULT_PORT)
+                .weight(ConfigurationConstants.DEFAULT_WEIGHT).ipTo(senderIp));
+
         updateNeighbors();
     }
-    
-    private void handleCustomMessage(String message) {}
+
+    private void handleCustomMessage(String message) {
+        String[] messageSplited = message.split(";");
+        String ipReceiver = messageSplited[1];
+
+        // Ler a mensagem caso seja para mim
+        if (ipReceiver == socket.getLocalAddress().getHostAddress()) {
+            System.out.println(messageSplited[2]);
+
+            // Senao, passo para o proximo
+        } else {
+            try {
+                Route destinyRoute = routes.get(ipReceiver);
+                InetAddress ipNeighbor = InetAddress.getByName(destinyRoute.getIpTo());
+                byte[] sendData = new byte[ConfigurationConstants.MAX_MESSAGE_SIZE];
+                sendData = message.getBytes();
+                DatagramPacket sendPacket = new DatagramPacket(sendData, sendData.length, ipNeighbor,
+                        ConfigurationConstants.DEFAULT_PORT);
+                socket.send(sendPacket);
+            } catch (UnknownHostException e) {
+                e.printStackTrace();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
+    }
 
     /* Test method */
-    private void survive() { 
+    private void survive() {
         boolean stayAlive = true;
         int i = 0;
 
@@ -149,17 +208,22 @@ public class NetworkManager {
                 ConsoleLogger.logWhite("I'm alive");
                 i++;
                 switch (i) {
-                    case 2 -> {changeNetworkState();}
-                    case 6 -> {changeNetworkState();}
-                    case 9 -> {messageSchedulerThread.setDefaultMessage("New random message");}
+                    case 2 -> {
+                    }
+                    case 6 -> {
+                        // changeNetworkState();
+                    }
+                    case 9 -> {
+                        messageSchedulerThread.setDefaultMessage("New random message");
+                    }
                     case 12 -> {
-                                routes.put(InetAddress.getLocalHost().getHostAddress(),
-                                            Route.build()
-                                                .ip(InetAddress.getLocalHost().getHostAddress())
-                                                .port(ConfigurationConstants.DEFAULT_PORT)
-                                                .weight(ConfigurationConstants.DEFAULT_WEIGHT + 1));
-                                updateNeighbors();
-                            }
+                        routes.put(InetAddress.getLocalHost().getHostAddress(),
+                                Route.build()
+                                        .ipEnd(InetAddress.getLocalHost().getHostAddress())
+                                        .port(ConfigurationConstants.DEFAULT_PORT)
+                                        .weight(ConfigurationConstants.DEFAULT_WEIGHT + 1).ipTo(null));
+                        updateNeighbors();
+                    }
                     case 15 -> {
                         stayAlive = false;
                         ConsoleLogger.logWhite("I'm dying");
@@ -171,15 +235,16 @@ public class NetworkManager {
                 ConsoleLogger.logError("Error while getting local host", e);
             }
         }
-        
+
         socket.close();
-        
+
         messageSchedulerThread.stop().interrupt();
         senderThread.stop().interrupt();
         receiverThread.stop().interrupt();
-        
+
         ConsoleLogger.logWhite("I'm dea...");
     }
+
     /**
      * This method is called when:
      * - A destination IP not found in the routing table is received
@@ -191,7 +256,7 @@ public class NetworkManager {
 
         updateNeighbors();
     }
-    
+
     private void updateNeighbors() {
         messageSchedulerThread.setRoutes(routes.values().toArray(Route[]::new));
         messageSchedulerThread.setDefaultMessage(buildRouteAnnouncementMessage());
@@ -201,7 +266,7 @@ public class NetworkManager {
         StringBuilder message = new StringBuilder();
         for (Route route : routes.values()) {
             message.append("@");
-            message.append(route.getIp());
+            message.append(route.getIpEnd());
             message.append("-");
             message.append(route.getWeight());
         }
@@ -216,6 +281,7 @@ public class NetworkManager {
             enterNetwork();
         }
     }
+
     private void exitNetwork() {
         ConsoleLogger.logWhite("Exiting network");
         insideNetwork = false;

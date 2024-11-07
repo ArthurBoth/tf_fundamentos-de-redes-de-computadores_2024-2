@@ -7,10 +7,10 @@ import java.util.concurrent.atomic.AtomicReferenceArray;
 import io.consoleIO.ConsoleLogger;
 import network.Route;
 
-public class TimeSchedulerThread extends NetworkThread{
+public class TimeSchedulerThread extends NetworkThread {
     private final long defaultMessageTimeMS;
     private final BlockingQueue<UDPWrapper> messageSender;
-    
+
     private volatile String defaultMessage;
     private AtomicReferenceArray<Route> routes;
 
@@ -26,7 +26,7 @@ public class TimeSchedulerThread extends NetworkThread{
     public void run() {
         ConsoleLogger.logYellow("TimeScheduler thread started");
         super.running = true;
-        
+
         while (running) {
             try {
                 Thread.sleep(defaultMessageTimeMS);
@@ -43,9 +43,9 @@ public class TimeSchedulerThread extends NetworkThread{
             route = routes.get(i);
             if (super.running) {
                 messageSender.add(UDPWrapper.build()
-                                    .ip(route.getIp())
-                                    .port(route.getPort())
-                                    .message(defaultMessage));
+                        .ip(route.getIpEnd())
+                        .port(route.getPort())
+                        .message(defaultMessage));
             }
         }
     }
@@ -80,7 +80,8 @@ public class TimeSchedulerThread extends NetworkThread{
         TimeSchedulerThread routesTableMessage(String defaultMessage);
     }
 
-    private static class Builder implements SocketSetter, DefaultMessageTimeMsSetter, MessageSenderSetter, DefaultMessageSetter {
+    private static class Builder
+            implements SocketSetter, DefaultMessageTimeMsSetter, MessageSenderSetter, DefaultMessageSetter {
         private DatagramSocket socket;
         private long defaultMessageTimeMS;
         private BlockingQueue<UDPWrapper> messageSender;
