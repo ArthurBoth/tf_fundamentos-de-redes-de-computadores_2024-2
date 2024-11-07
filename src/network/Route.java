@@ -1,23 +1,17 @@
 package network;
 
 public class Route {
-    private String ip;
+    private String ipEnd;
     private int port;
     private int weight;
+    private String ipTo;
 
     public boolean isNeighbor() {
         return this.getWeight() == 1;
-    } 
+    }
 
     // ************************************************************
     // Getters and Setters
-    public String getIp() {
-        return this.ip;
-    }
-
-    public void setIp(String ip) {
-        this.ip = ip;
-    }
 
     public int getPort() {
         return this.port;
@@ -35,20 +29,37 @@ public class Route {
         this.weight = weight;
     }
 
+    public String getIpEnd() {
+        return ipEnd;
+    }
+
+    public void setIpEnd(String ipEnd) {
+        this.ipEnd = ipEnd;
+    }
+
+    public String getIpTo() {
+        return ipTo;
+    }
+
+    public void setIpTo(String ipTo) {
+        this.ipTo = ipTo;
+    }
+
     // ************************************************************
     // Builder pattern implementation
     private Route(Builder builder) {
-        this.ip = builder.ip;
+        this.ipEnd = builder.ipEnd;
         this.port = builder.port;
         this.weight = builder.weight;
+        this.ipTo = builder.ipTo;
     }
 
-    public static IpSetter build() {
+    public static IpEndSetter build() {
         return new Builder();
     }
 
-    public interface IpSetter {
-        PortSetter ip(String ip);
+    public interface IpEndSetter {
+        PortSetter ipEnd(String ipEnd);
     }
 
     public interface PortSetter {
@@ -56,17 +67,22 @@ public class Route {
     }
 
     public interface WeightSetter {
-        Route weight(int weight);
+        IpToSetter weight(int weight);
     }
 
-    private static class Builder implements IpSetter, PortSetter, WeightSetter {
-        private String ip;
+    public interface IpToSetter {
+        Route ipTo(String ipTo);
+    }
+
+    private static class Builder implements IpEndSetter, PortSetter, WeightSetter, IpToSetter {
+        private String ipEnd;
         private int port;
         private int weight;
+        private String ipTo;
 
         @Override
-        public PortSetter ip(String ip) {
-            this.ip = ip;
+        public PortSetter ipEnd(String ip) {
+            ipEnd = ip;
             return this;
         }
 
@@ -77,8 +93,14 @@ public class Route {
         }
 
         @Override
-        public Route weight(int weight) {
+        public IpToSetter weight(int weight) {
             this.weight = weight;
+            return this;
+        }
+
+        @Override
+        public Route ipTo(String ip) {
+            ipTo = ip;
             return new Route(this);
         }
     }
