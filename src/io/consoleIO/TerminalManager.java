@@ -4,17 +4,22 @@ import java.util.NoSuchElementException;
 import java.util.Scanner;
 import java.util.concurrent.BlockingQueue;
 
+import constants.ConfigurationConstants;
+import constants.RegEx;
+
 public class TerminalManager implements Runnable {
     private final BlockingQueue<String> messageQueue;
     private final Scanner scanner;
     private final String userIp;
-
+    
+    private boolean insideNetwork;
     private boolean running;
     
-    public TerminalManager(String userIp, BlockingQueue<String> messageQueue) {
+    public TerminalManager(String userIp, BlockingQueue<String> messageQueue, boolean insideNetwork) {
         this.userIp = userIp;
         this.messageQueue = messageQueue;
         scanner = new Scanner(System.in);
+        this.insideNetwork = insideNetwork;
         running = true;
     }
 
@@ -32,12 +37,12 @@ public class TerminalManager implements Runnable {
     public Thread stop() {
         running = false;
         scanner.close();
-        messageQueue.add("■KillMainThread");
+        messageQueue.add(String.format("%s:▬KillMainThread▬", RegEx.LOCALHOST));
         return Thread.currentThread();
     }
 
     private void printMenu() {
-        ConsoleLogger.logCyan(String.format("You're currently %sconnected to the network", running ? "" : "not "));
+        ConsoleLogger.logCyan(String.format("You're currently %sconnected to the network", insideNetwork ? "" : "not "));
         ConsoleLogger.logWhite("[1] Enter/Exit network");
         ConsoleLogger.logWhite("[2] Send custom message");
         ConsoleLogger.logWhite("[3] Kill this program");
@@ -61,9 +66,8 @@ public class TerminalManager implements Runnable {
     }
 
     private void processResponse(int response) {
-        ConsoleLogger.logYellow("DEBUG");
         switch (response) {
-            case 1 -> {messageQueue.add("ºSwichNetworkState");}
+            case 1 -> {messageQueue.add(String.format("%s:ºSwichNetworkStateº", RegEx.LOCALHOST));}
             case 2 -> {buildMessage();} 
             case 3 -> {stop();}
             default -> {ConsoleLogger.logRed("Invalid response. Please try again.");}
@@ -74,7 +78,7 @@ public class TerminalManager implements Runnable {
         String destinationIp = getUserInputIp();
         String message = getUserInputMessage();
 
-        messageQueue.add(String.format("!%s;%s;%s", userIp, destinationIp, message));
+        messageQueue.add(String.format("%s:¼!%s;%s;%s", RegEx.LOCALHOST, userIp, destinationIp, message));
     }
 
     private String getUserInputIp() {
@@ -84,7 +88,7 @@ public class TerminalManager implements Runnable {
                 ConsoleLogger.logWhite("Enter the Ip you want to send the message: ", false);
                 ip = scanner.nextLine();
     
-                if (ip.matches("\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}")) return ip;
+                if (ip.matches(RegEx.IP_ADDRESS)) return ip;
 
                 throw new NoSuchElementException();
             } catch (NoSuchElementException e) {
