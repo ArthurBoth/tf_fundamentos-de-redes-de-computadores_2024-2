@@ -20,7 +20,6 @@ public class ReceiverThread extends NetworkThread {
 
     @Override
     public void run() {
-        ConsoleLogger.logBlue("Receiver thread started");
         byte[] data;
         DatagramPacket packet;
         String senderIp;

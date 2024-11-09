@@ -36,7 +36,7 @@ public class TerminalManager implements Runnable {
     public Thread stop() {
         running = false;
         scanner.close();
-        messageQueue.add(String.format("%s:▬KillMainThread▬", RegEx.LOCALHOST));
+        messageQueue.add(String.format("%s:▬ Kill Main Thread ▬", RegEx.LOCALHOST));
         return Thread.currentThread();
     }
 
@@ -74,7 +74,7 @@ public class TerminalManager implements Runnable {
     }
 
     private void changeNetworkState() {
-        messageQueue.add(String.format("%s:ºSwichNetworkStateº", RegEx.LOCALHOST));
+        messageQueue.add(String.format("%s:º Swich Network State º", RegEx.LOCALHOST));
         try {
             Thread.sleep(1000);
         } catch (InterruptedException e) {

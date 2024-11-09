@@ -9,6 +9,7 @@ import java.util.Map.Entry;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 
 import constants.ConfigurationConstants;
 import constants.RegEx;
@@ -17,6 +18,7 @@ import io.consoleIO.ConsoleLogger;
 import network.threads.ReceiverThread;
 import network.threads.SenderThread;
 import network.threads.TimeSchedulerThread;
+import network.threads.TimeoutManagerThread;
 import network.threads.UDPWrapper;
 
 public class NetworkManager {
@@ -29,6 +31,7 @@ public class NetworkManager {
     private SenderThread senderThread;
     private ReceiverThread receiverThread;
     private TimeSchedulerThread messageSchedulerThread;
+    private TimeoutManagerThread timeoutThread;
 
     // Variables relevant to the network state
     private BlockingQueue<String> receiveMessages;
@@ -65,6 +68,7 @@ public class NetworkManager {
                     .defaultMessageTimeMS(ConfigurationConstants.DEFAULT_MESSAGE_TIME_MS)
                     .messageSender(sendMessages)
                     .routesTableMessage(buildRouteAnnouncementMessage());
+            timeoutThread = new TimeoutManagerThread(socket, receiveMessages);
 
             updateNeighbors();
         } catch (IOException e) {
@@ -86,6 +90,7 @@ public class NetworkManager {
         socket.close();
         messageSchedulerThread.stop().interrupt();
         senderThread.stop().interrupt();
+        timeoutThread.stop().interrupt();
         receiverThread.stop().interrupt();
         io.stopConsole();
     }
@@ -118,6 +123,7 @@ public class NetworkManager {
             case '!' -> {handleCustomMessage(message);}
             case 'º' -> {changeNetworkState();}        // Alt + 0186 
             case '¼' -> {handleSendMessage(message);}  // Alt + 7852 
+            case '¶' -> {handleTimeout(message);}  // Alt + 7412
             case '▬' -> {return false;} // Should die  // Alt + 7958   
             default  -> {ConsoleLogger.logRed("Unsuported message header, message discarted: " + header);}
         }
@@ -189,14 +195,28 @@ public class NetworkManager {
         handleSendMessage(message); // forwards the message
     }
 
+    private void handleTimeout(String message) {
+        // ¶ Timeout ip ¶:127.0.0.1
+        timeoutThread.removeIp(message.split(":")[1]);
+    }
+
     private void updateRoutesTable(HashMap<String, Route> routeUpdates) {
-        routes = routeUpdates; // This discards all that weren't received
+        // routes = routeUpdates; // This discards all that weren't received
+
+        // todo re-evaluate current routes and decide if any should be removed
 
         updateNeighbors();
     }
+    
     private void updateNeighbors() {
         messageSchedulerThread.setNeighbours(routes.values().stream().filter(Route::isNeighbor).toArray(Route[]::new));
         messageSchedulerThread.setDefaultMessage(buildRouteAnnouncementMessage());
+        timeoutThread.setIps(routes.entrySet()
+                                    .stream()
+                                    .filter(x -> x.getValue().isNeighbor())
+                                    .map(Entry::getKey)
+                                    .collect(Collectors.toSet()));
+        
     }
 
     private String buildRouteAnnouncementMessage() {
@@ -223,6 +243,7 @@ public class NetworkManager {
         insideNetwork = false;
 
         senderThread.stop();
+        timeoutThread.stop();
         receiverThread.stop();
         messageSchedulerThread.stop();
         io.exitNetwork();
@@ -234,6 +255,7 @@ public class NetworkManager {
         enterNetwork(new Thread(() -> senderThread.run()));
         enterNetwork(new Thread(() -> receiverThread.run()));
         enterNetwork(new Thread(() -> messageSchedulerThread.run()));
+        enterNetwork(new Thread(() -> timeoutThread.run()));
         io.enterNetwork();
     }
 

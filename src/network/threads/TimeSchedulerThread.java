@@ -24,7 +24,6 @@ public class TimeSchedulerThread extends NetworkThread {
 
     @Override
     public void run() {
-        ConsoleLogger.logYellow("TimeScheduler thread started");
         super.running = true;
 
         while (running) {

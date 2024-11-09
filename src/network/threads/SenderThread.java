@@ -42,7 +42,6 @@ public class SenderThread extends NetworkThread {
 
     @Override
     public void run() {
-        ConsoleLogger.logGreen("Sender thread started");
         UDPWrapper message;
         super.running = true;
         

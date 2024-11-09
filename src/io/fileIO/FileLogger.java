@@ -4,12 +4,13 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 
 import constants.ConfigurationConstants;
+import constants.RegEx;
 
 public class FileLogger {
     private final DateTimeFormatter dateTime;
 
     public FileLogger() {
-        dateTime = DateTimeFormatter.ofPattern(ConfigurationConstants.DATE_TIME_LOG_FORMAT);
+        dateTime = DateTimeFormatter.ofPattern(RegEx.DATE_TIME_LOG_FORMAT);
         
         if (ConfigurationConstants.CLEAR_PREVIOUS_LOGS) FileIO.clearFile(ConfigurationConstants.LOG_FILE_NAME);
   
