@@ -4,6 +4,7 @@ import java.util.concurrent.BlockingQueue;
 
 import constants.ConfigurationConstants;
 import constants.RegEx;
+import io.consoleIO.ConsoleLogger;
 import io.consoleIO.TerminalManager;
 import io.fileIO.FileIO;
 import io.fileIO.FileLogger;
@@ -11,11 +12,12 @@ import io.fileIO.FileLogger;
 public class IOManager {
     BlockingQueue<String> networkQueue;
     TerminalManager terminal;
-    FileLogger logger;
+    FileLogger msgLogger;
 
-    public IOManager(BlockingQueue<String> networkQueue) {
+    public IOManager(BlockingQueue<String> networkQueue, String thisIp) {
         this.networkQueue = networkQueue;
-        logger = new FileLogger();
+        msgLogger = new FileLogger(ConfigurationConstants.LOG_MESSAGES_FILE);
+        ConsoleLogger.logWhite(String.format("This machine's ip adress is: %s", thisIp));
     }
     
     public String[] getDefaultRoutes() {
@@ -32,10 +34,10 @@ public class IOManager {
         terminal.stop().interrupt();
     }
 
-    public void log(String senderIp,String message) {
+    public void logMessage(String senderIp, String message) {
         if ((!ConfigurationConstants.LOG_LOCALHOST) && (senderIp.equals(RegEx.LOCALHOST))) return;
 
-        logger.log(String.format("Message from %s: %s", senderIp, message));
+        msgLogger.log(String.format("Message from %s: %s", senderIp, message));
     }
 
     public void enterNetwork() {

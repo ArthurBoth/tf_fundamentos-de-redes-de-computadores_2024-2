@@ -10,6 +10,7 @@ import java.util.stream.Collectors;
 
 import constants.ConfigurationConstants;
 import constants.RegEx;
+import io.consoleIO.ConsoleLogger;
 
 public class TimeoutManagerThread extends NetworkThread {
     private BlockingQueue<String> messageQueue;
@@ -37,17 +38,36 @@ public class TimeoutManagerThread extends NetworkThread {
         }
     }
 
-    public void setIps(Set<String> ipsToAdd) {
+    public void resetCount(String ip) {
         try {
             semaphore.acquire();
         } catch (InterruptedException e) {
             return;
         }
 
-        ips = ipsToAdd.stream()
-                        .collect(Collectors.toMap(ip -> ip, _ -> 0, (ip, _) -> ip, HashMap::new));
+        ips.put(ip, 0);
 
         semaphore.release();
+    }
+
+    public void setIps(Set<String> ipsToAdd) {
+        try {
+            semaphore.acquire();
+        } catch (InterruptedException e) {
+            return;
+        }
+        
+        ips = ipsToAdd.stream()
+                        .collect(Collectors.toMap(ip -> ip, _ -> 0, (ip, _) -> ip, HashMap::new));
+        
+        semaphore.release();
+
+        if (ConfigurationConstants.DEBUG_LOGS) {
+            StringBuilder builder = new StringBuilder();
+            ips.forEach((key, _) -> builder.append(String.format("%s, ", key)));
+            ConsoleLogger.logPurple(String.format("Set timeout: %s", 
+                                        builder.toString().substring(0, builder.length() - 2)));
+        }
     }
 
     public void removeIp(String ip) {
@@ -60,6 +80,9 @@ public class TimeoutManagerThread extends NetworkThread {
         ips.remove(ip);
 
         semaphore.release();
+
+        if (ConfigurationConstants.DEBUG_LOGS)
+            ConsoleLogger.logPurple(String.format("Removed %s from timeouts", ip));
     }
 
     private void count() {
@@ -72,6 +95,9 @@ public class TimeoutManagerThread extends NetworkThread {
         ips.replaceAll((_, value) -> value + 1);
      
         semaphore.release();
+
+        if (ConfigurationConstants.DEBUG_LOGS)
+            ConsoleLogger.logPurple("count++");
     }
     
     private void verifyTimeout() {
@@ -83,7 +109,7 @@ public class TimeoutManagerThread extends NetworkThread {
 
         String[] timedOutIps = ips.entrySet()
                                     .stream()
-                                    .filter(x -> ((x.getValue()) <= ConfigurationConstants.TIMEOUT_TOLERANCE_SEC))
+                                    .filter(x -> ((x.getValue()) > ConfigurationConstants.TIMEOUT_TOLERANCE_SEC))
                                     .map(Entry::getKey)
                                     .toArray(String[]::new);
         
@@ -91,6 +117,9 @@ public class TimeoutManagerThread extends NetworkThread {
 
         for (String ip : timedOutIps) {
             messageQueue.add(String.format("%s:¶ Timeout ip ¶:%s", RegEx.LOCALHOST, ip));
+
+            if (ConfigurationConstants.DEBUG_LOGS)
+                ConsoleLogger.logPurple(String.format("%s timed out", ip));
         }
     }
 }

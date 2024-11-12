@@ -21,6 +21,12 @@ public abstract class ConsoleLogger {
         System.out.println(Colours.RESET);
     }
     
+    public static synchronized void logPurple(String message) {
+        System.out.print(Colours.PURPLE);
+        System.out.print(message);
+        System.out.println(Colours.RESET);
+    }
+    
     public static synchronized void logBlue(String message) {
         System.out.print(Colours.BLUE);
         System.out.print(message);

@@ -4,6 +4,7 @@ import java.net.DatagramSocket;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.atomic.AtomicReferenceArray;
 
+import constants.ConfigurationConstants;
 import io.consoleIO.ConsoleLogger;
 import network.Route;
 
@@ -28,15 +29,18 @@ public class TimeSchedulerThread extends NetworkThread {
 
         while (running) {
             try {
-                Thread.sleep(defaultMessageTimeMS);
+                if (ConfigurationConstants.DEBUG_LOGS)
+                    ConsoleLogger.logGreen("Timer proc");
+                    
                 sendDefaultMessage();
+                Thread.sleep(defaultMessageTimeMS);
             } catch (InterruptedException e) {
                 ConsoleLogger.logError("Error while sleeping", e);
             }
         }
     }
 
-    private void sendDefaultMessage() {
+    public void sendDefaultMessage() {
         Route route;
         for (int i = 0; i < routes.length(); i++) {
             route = routes.get(i);

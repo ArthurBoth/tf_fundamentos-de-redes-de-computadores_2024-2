@@ -26,6 +26,9 @@ public class SenderThread extends NetworkThread {
         DatagramPacket packet;
 
         try {
+            if (ConfigurationConstants.DEBUG_LOGS) 
+                ConsoleLogger.logCyan("Sending " + wrapper.getIp() + ":" + wrapper.getMessage());
+                
             data = wrapper.getMessageBytes();
             neighbor = InetAddress.getByName(wrapper.getIp());
             port = wrapper.getPort();

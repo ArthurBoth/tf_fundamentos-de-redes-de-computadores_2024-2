@@ -32,31 +32,23 @@ public class NetworkManager {
     private ReceiverThread receiverThread;
     private TimeSchedulerThread messageSchedulerThread;
     private TimeoutManagerThread timeoutThread;
+    private final String MY_IP_ADDRESS;
 
     // Variables relevant to the network state
     private BlockingQueue<String> receiveMessages;
     private BlockingQueue<UDPWrapper> sendMessages;
     private boolean insideNetwork;
 
-    public NetworkManager() {
+    public NetworkManager() throws UnknownHostException{
+        MY_IP_ADDRESS = InetAddress.getLocalHost().getHostAddress();
         routes = new HashMap<>();
         receiveMessages = new LinkedBlockingQueue<>();
         sendMessages = new LinkedBlockingQueue<>();
 
-        io = new IOManager(receiveMessages);
+        io = new IOManager(receiveMessages, MY_IP_ADDRESS);
     }
 
     private void setup() {
-        String[] defaultRoutes;
-
-        defaultRoutes = io.getDefaultRoutes();
-        for (String routeIp : defaultRoutes) {
-            routes.put(routeIp, Route.build()
-                                        .sendTo(routeIp)
-                                        .port(ConfigurationConstants.DEFAULT_PORT)
-                                        .weight(ConfigurationConstants.DEFAULT_WEIGHT));
-        }
-
         try {
             socket = new DatagramSocket(ConfigurationConstants.DEFAULT_PORT);
             sendMessages = new LinkedBlockingQueue<>();
@@ -67,7 +59,7 @@ public class NetworkManager {
                     .socket(socket)
                     .defaultMessageTimeMS(ConfigurationConstants.DEFAULT_MESSAGE_TIME_MS)
                     .messageSender(sendMessages)
-                    .routesTableMessage(buildRouteAnnouncementMessage());
+                    .routesTableMessage(RegEx.NULL);
             timeoutThread = new TimeoutManagerThread(socket, receiveMessages);
 
             updateNeighbors();
@@ -76,14 +68,21 @@ public class NetworkManager {
         }
     }
 
-    public void start() {
-        try {
-            setup();
-            io.startConsole(InetAddress.getLocalHost().getHostAddress(), insideNetwork);
-        } catch (UnknownHostException e) {
-            ConsoleLogger.logError("Error while getting local host", e);
-            return;
+    private void buildDefaultRoutes() {
+        String[] defaultRoutes;
+
+        defaultRoutes = io.getDefaultRoutes();
+        for (String routeIp : defaultRoutes) {
+            routes.put(routeIp, Route.build()
+                                        .sendTo(routeIp)
+                                        .port(ConfigurationConstants.DEFAULT_PORT)
+                                        .weight(ConfigurationConstants.DEFAULT_WEIGHT));
         }
+    }
+
+    public void start() {
+        setup();
+        io.startConsole(MY_IP_ADDRESS, insideNetwork);
         
         messageLoop();
 
@@ -115,7 +114,10 @@ public class NetworkManager {
         String message = codedMessage.split(":",2)[1];
         char header = message.toCharArray()[0];
 
-        io.log(senderIp, message);
+        io.logMessage(senderIp, message);
+        if ((!senderIp.equals(RegEx.LOCALHOST)) && (!senderIp.equals(MY_IP_ADDRESS))) {
+            timeoutThread.resetCount(senderIp);
+        }
 
         switch (header) {
             case '@' -> {handleRoutesTable(senderIp, message);}
@@ -123,7 +125,7 @@ public class NetworkManager {
             case '!' -> {handleCustomMessage(message);}
             case 'º' -> {changeNetworkState();}        // Alt + 0186 
             case '¼' -> {handleSendMessage(message);}  // Alt + 7852 
-            case '¶' -> {handleTimeout(message);}  // Alt + 7412
+            case '¶' -> {handleTimeout(message);}      // Alt + 7412
             case '▬' -> {return false;} // Should die  // Alt + 7958   
             default  -> {ConsoleLogger.logRed("Unsuported message header, message discarted: " + header);}
         }
@@ -137,7 +139,7 @@ public class NetworkManager {
         int weight;
 
         for (String route : routesTable) {
-            if (route.isBlank()) continue;
+            if (route.isBlank() || route.equals(MY_IP_ADDRESS)) continue;
 
             destinationIp = route.split("-")[0];
             weight = Integer.parseInt(route.split("-")[1]);
@@ -155,9 +157,19 @@ public class NetworkManager {
             } else {
                 updates.put(destinationIp, routes.get(destinationIp));
             } 
-
-            updateRoutesTable(updates);
         }
+
+        for (Entry<String, Route> entry : routes.entrySet()) {
+            if ((!updates.containsKey(entry.getKey())) && (!entry.getValue().getSendToIp().equals(senderIp))) {
+                updates.put(entry.getKey(), entry.getValue());
+            }
+        }
+        
+        updates.put(senderIp, Route.build()
+                                    .sendTo(senderIp)
+                                    .port(ConfigurationConstants.DEFAULT_PORT)
+                                    .weight(ConfigurationConstants.DEFAULT_WEIGHT));
+        updateRoutesTable(updates);
     }
 
     private void handleRouteAnnouncement(String message) {
@@ -174,13 +186,16 @@ public class NetworkManager {
         String[] messageData = message.split(";");
         String destinationIp = messageData[0].substring(2);
 
-        if ((ConfigurationConstants.SEND_LOOPBACK_MESSAGES) && (destinationIp.equals(RegEx.LOCALHOST)))
+        if ((!ConfigurationConstants.SEND_LOOPBACK_MESSAGES) && 
+            ((destinationIp.equals(RegEx.LOCALHOST)) || (destinationIp.equals(MY_IP_ADDRESS)))) 
             return;
 
         sendMessages.add(UDPWrapper.build()
                                     .ip(destinationIp)
                                     .port(ConfigurationConstants.DEFAULT_PORT)
                                     .message(message.substring(1)));
+        if (ConfigurationConstants.DEBUG_LOGS) 
+            ConsoleLogger.logYellow(String.format("Message sent to %s: %s", destinationIp, messageData[1]));
     }
 
     private void handleCustomMessage(String message) {
@@ -196,27 +211,27 @@ public class NetworkManager {
     }
 
     private void handleTimeout(String message) {
-        // ¶ Timeout ip ¶:127.0.0.1
+        routes.entrySet().removeIf(x -> x.getValue().getSendToIp().equals(message.split(":")[1]));
         timeoutThread.removeIp(message.split(":")[1]);
+        updateNeighbors();
     }
 
     private void updateRoutesTable(HashMap<String, Route> routeUpdates) {
-        // routes = routeUpdates; // This discards all that weren't received
-
-        // todo re-evaluate current routes and decide if any should be removed
+        routeUpdates.entrySet().removeIf(x -> x.getValue().getWeight() > ConfigurationConstants.MAX_WEIGHT);
+        routes = routeUpdates;
 
         updateNeighbors();
+        messageSchedulerThread.sendDefaultMessage();
     }
     
     private void updateNeighbors() {
         messageSchedulerThread.setNeighbours(routes.values().stream().filter(Route::isNeighbor).toArray(Route[]::new));
         messageSchedulerThread.setDefaultMessage(buildRouteAnnouncementMessage());
-        timeoutThread.setIps(routes.entrySet()
-                                    .stream()
-                                    .filter(x -> x.getValue().isNeighbor())
-                                    .map(Entry::getKey)
-                                    .collect(Collectors.toSet()));
-        
+        timeoutThread.setIps(new HashMap<>(routes).entrySet()
+                                                    .stream()
+                                                    .filter(x -> x.getValue().isNeighbor())
+                                                    .map(Entry::getKey)
+                                                    .collect(Collectors.toSet()));
     }
 
     private String buildRouteAnnouncementMessage() {
@@ -257,6 +272,25 @@ public class NetworkManager {
         enterNetwork(new Thread(() -> messageSchedulerThread.run()));
         enterNetwork(new Thread(() -> timeoutThread.run()));
         io.enterNetwork();
+
+        buildDefaultRoutes();
+
+        for (Route route : routes.values()) {
+            if (route.isNeighbor()) {
+                sendMessages.add(UDPWrapper.build()
+                                            .ip(route.getSendToIp())
+                                            .port(route.getPort())
+                                            .message(String.format("*%s", MY_IP_ADDRESS)));
+            }
+        }
+        
+        messageSchedulerThread.sendDefaultMessage();
+
+        // todo: review message's order
+        // messageSchedulerThread.setNeighbours(routes.values().stream().filter(Route::isNeighbor).toArray(Route[]::new));
+        // messageSchedulerThread.setDefaultMessage(buildRouteAnnouncementMessage());
+        // io.logAction(String.format("Entered network with %d neighbors", routes.size()));
+        // io.logAction(String.format("Routes: %s", buildRouteAnnouncementMessage()));
     }
 
     private void enterNetwork(Thread thread) {
